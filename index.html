@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>דשבורד ניהול מלאי</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1a202c;
+      --text-muted: #718096;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --danger: #e53e3e;
+      --success: #38a169;
+      --warning: #d69e2e;
+      --warning-bg: #fffbeb;
+      --danger-bg: #fff5f5;
+      --success-bg: #f0fff4;
+      --radius: 10px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 700; }
+    header p { font-size: 0.85rem; opacity: 0.85; }
+
+    .main { max-width: 1100px; margin: 0 auto; padding: 20px 16px; }
+
+    /* Stats row */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      text-align: center;
+    }
+    .stat-card .num { font-size: 2rem; font-weight: 700; }
+    .stat-card .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+    .stat-card.low .num { color: var(--danger); }
+    .stat-card.ok .num { color: var(--success); }
+    .stat-card.expiring .num { color: var(--warning); }
+
+    /* Add product panel */
+    .panel {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+    .panel-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .panel-header h2 { font-size: 1rem; font-weight: 600; }
+    .panel-toggle { font-size: 1.2rem; transition: transform .2s; }
+    .panel-toggle.open { transform: rotate(180deg); }
+    .panel-body { padding: 20px; }
+    .panel-body.hidden { display: none; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); }
+    .form-group input,
+    .form-group select {
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color .15s;
+      width: 100%;
+    }
+    .form-group input:focus,
+    .form-group select:focus { border-color: var(--primary); }
+
+    .form-actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      padding: 9px 20px;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-secondary { background: var(--border); color: var(--text); }
+    .btn-secondary:hover { background: #cbd5e0; }
+    .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+    .btn-danger { background: var(--danger-bg); color: var(--danger); border: 1px solid #feb2b2; }
+    .btn-danger:hover { background: #fed7d7; }
+
+    /* Filters */
+    .filters {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .filters input,
+    .filters select {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 0.9rem;
+      outline: none;
+      flex: 1;
+      min-width: 130px;
+    }
+    .filters input:focus,
+    .filters select:focus { border-color: var(--primary); }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 580px; }
+    th {
+      background: #f7fafc;
+      padding: 10px 14px;
+      text-align: right;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+    td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f7fafc; }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-low { background: var(--danger-bg); color: var(--danger); }
+    .badge-ok { background: var(--success-bg); color: var(--success); }
+    .badge-expiring { background: var(--warning-bg); color: var(--warning); }
+    .badge-category { background: #ebf4ff; color: #3182ce; }
+
+    .expiry-input {
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      width: 130px;
+    }
+    .expiry-input:focus { outline: none; border-color: var(--primary); }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+    }
+
+    /* Mobile cards */
+    .mobile-cards { display: none; }
+    .product-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .product-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+    .product-card-name { font-weight: 700; font-size: 1rem; }
+    .product-card-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.88rem;
+    }
+    .product-card-row:last-child { border-bottom: none; }
+    .product-card-label { color: var(--text-muted); }
+    .product-card-actions { margin-top: 10px; display: flex; gap: 8px; }
+
+    @media (max-width: 640px) {
+      .table-wrap table { display: none; }
+      .mobile-cards { display: block; }
+      header h1 { font-size: 1.1rem; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #2d3748;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      z-index: 999;
+      transition: transform .3s;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📦 דשבורד ניהול מלאי</h1>
+    <p id="last-update">טוען...</p>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="num" id="stat-total">0</div>
+      <div class="label">סה"כ מוצרים</div>
+    </div>
+    <div class="stat-card low">
+      <div class="num" id="stat-low">0</div>
+      <div class="label">מלאי נמוך</div>
+    </div>
+    <div class="stat-card ok">
+      <div class="num" id="stat-ok">0</div>
+      <div class="label">מלאי תקין</div>
+    </div>
+    <div class="stat-card expiring">
+      <div class="num" id="stat-expiring">0</div>
+      <div class="label">פג תוקף בקרוב</div>
+    </div>
+  </div>
+
+  <!-- Add Product -->
+  <div class="panel">
+    <div class="panel-header" onclick="togglePanel()">
+      <h2>➕ הוספת מוצר חדש</h2>
+      <span class="panel-toggle" id="panel-toggle">▼</span>
+    </div>
+    <div class="panel-body hidden" id="add-panel">
+      <form onsubmit="addProduct(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>שם מוצר *</label>
+            <input type="text" id="f-name" placeholder="לדוגמה: חלב 1%" required />
+          </div>
+          <div class="form-group">
+            <label>קטגוריה *</label>
+            <select id="f-category" required>
+              <option value="">בחר קטגוריה</option>
+              <option>מוצרי חלב</option>
+              <option>לחם ומאפים</option>
+              <option>ירקות ופירות</option>
+              <option>בשר ודגים</option>
+              <option>שימורים</option>
+              <option>משקאות</option>
+              <option>חטיפים וממתקים</option>
+              <option>ניקיון</option>
+              <option>אחר</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>כמות במלאי *</label>
+            <input type="number" id="f-qty" min="0" placeholder="0" required />
+          </div>
+          <div class="form-group">
+            <label>סף מלאי נמוך *</label>
+            <input type="number" id="f-low" min="1" placeholder="לדוגמה: 5" required />
+          </div>
+          <div class="form-group">
+            <label>סף מלאי תקין *</label>
+            <input type="number" id="f-normal" min="1" placeholder="לדוגמה: 20" required />
+          </div>
+          <div class="form-group">
+            <label>תאריך תפוגה</label>
+            <input type="date" id="f-expiry" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">הוסף מוצר</button>
+          <button type="button" class="btn btn-secondary" onclick="clearForm()">נקה</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Products Table -->
+  <div class="panel">
+    <div class="panel-header" style="cursor:default">
+      <h2>📋 רשימת מוצרים</h2>
+    </div>
+    <div class="panel-body">
+      <div class="filters">
+        <input type="text" id="search" placeholder="🔍 חיפוש מוצר..." oninput="renderTable()" />
+        <select id="filter-cat" onchange="renderTable()">
+          <option value="">כל הקטגוריות</option>
+        </select>
+        <select id="filter-status" onchange="renderTable()">
+          <option value="">כל הסטטוסים</option>
+          <option value="low">מלאי נמוך</option>
+          <option value="ok">מלאי תקין</option>
+          <option value="expiring">פג תוקף בקרוב</option>
+        </select>
+      </div>
+
+      <!-- Desktop table -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>מוצר</th>
+              <th>קטגוריה</th>
+              <th>כמות</th>
+              <th>סף נמוך</th>
+              <th>סף תקין</th>
+              <th>סטטוס</th>
+              <th>תאריך תפוגה</th>
+              <th>פעולות</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Mobile cards -->
+      <div class="mobile-cards" id="mobile-cards"></div>
+
+      <div class="empty-state hidden" id="empty-state">
+        אין מוצרים להציג
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const STORAGE_KEY = 'inventory_products';
+
+  let products = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || [
+    { id: 1, name: 'חלב תנובה 3%', category: 'מוצרי חלב', qty: 4, low: 5, normal: 20, expiry: '2025-11-20' },
+    { id: 2, name: 'לחם אחיד', category: 'לחם ומאפים', qty: 15, low: 5, normal: 15, expiry: '2025-11-12' },
+    { id: 3, name: 'עגבניות', category: 'ירקות ופירות', qty: 25, low: 10, normal: 30, expiry: '2025-11-18' },
+    { id: 4, name: 'שמן זית', category: 'שימורים', qty: 2, low: 3, normal: 10, expiry: '2026-06-01' },
+    { id: 5, name: 'מים מינרלים', category: 'משקאות', qty: 50, low: 12, normal: 24, expiry: '2027-01-01' },
+  ];
+
+  let nextId = products.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+  }
+
+  function getStatus(p) {
+    if (p.qty <= p.low) return 'low';
+    return 'ok';
+  }
+
+  function isExpiringSoon(expiry) {
+    if (!expiry) return false;
+    const d = new Date(expiry);
+    const now = new Date();
+    const diff = (d - now) / (1000 * 60 * 60 * 24);
+    return diff >= 0 && diff <= 7;
+  }
+
+  function formatDate(d) {
+    if (!d) return '—';
+    const [y, m, day] = d.split('-');
+    return `${day}/${m}/${y}`;
+  }
+
+  function updateStats() {
+    const total = products.length;
+    const low = products.filter(p => getStatus(p) === 'low').length;
+    const ok = total - low;
+    const expiring = products.filter(p => isExpiringSoon(p.expiry)).length;
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-low').textContent = low;
+    document.getElementById('stat-ok').textContent = ok;
+    document.getElementById('stat-expiring').textContent = expiring;
+
+    const now = new Date();
+    document.getElementById('last-update').textContent =
+      `עדכון אחרון: ${now.toLocaleTimeString('he-IL')}`;
+  }
+
+  function updateCategoryFilter() {
+    const cats = [...new Set(products.map(p => p.category))].sort();
+    const sel = document.getElementById('filter-cat');
+    const val = sel.value;
+    sel.innerHTML = '<option value="">כל הקטגוריות</option>' +
+      cats.map(c => `<option ${c === val ? 'selected' : ''}>${c}</option>`).join('');
+  }
+
+  function getFiltered() {
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    const cat = document.getElementById('filter-cat').value;
+    const status = document.getElementById('filter-status').value;
+    return products.filter(p => {
+      if (q && !p.name.toLowerCase().includes(q) && !p.category.toLowerCase().includes(q)) return false;
+      if (cat && p.category !== cat) return false;
+      if (status === 'low' && getStatus(p) !== 'low') return false;
+      if (status === 'ok' && getStatus(p) !== 'ok') return false;
+      if (status === 'expiring' && !isExpiringSoon(p.expiry)) return false;
+      return true;
+    });
+  }
+
+  function renderTable() {
+    const list = getFiltered();
+    const tbody = document.getElementById('table-body');
+    const mobile = document.getElementById('mobile-cards');
+    const empty = document.getElementById('empty-state');
+
+    if (list.length === 0) {
+      tbody.innerHTML = '';
+      mobile.innerHTML = '';
+      empty.classList.remove('hidden');
+    } else {
+      empty.classList.add('hidden');
+
+      tbody.innerHTML = list.map(p => {
+        const st = getStatus(p);
+        const exp = isExpiringSoon(p.expiry);
+        return `<tr>
+          <td><strong>${esc(p.name)}</strong></td>
+          <td><span class="badge badge-category">${esc(p.category)}</span></td>
+          <td>${p.qty}</td>
+          <td>${p.low}</td>
+          <td>${p.normal}</td>
+          <td>
+            <span class="badge badge-${st}">${st === 'low' ? 'נמוך' : 'תקין'}</span>
+            ${exp ? '<span class="badge badge-expiring" style="margin-right:4px">פג בקרוב</span>' : ''}
+          </td>
+          <td>
+            <input type="date" class="expiry-input" value="${p.expiry || ''}"
+              onchange="updateExpiry(${p.id}, this.value)" />
+          </td>
+          <td>
+            <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">מחק</button>
+          </td>
+        </tr>`;
+      }).join('');
+
+      mobile.innerHTML = list.map(p => {
+        const st = getStatus(p);
+        const exp = isExpiringSoon(p.expiry);
+        return `<div class="product-card">
+          <div class="product-card-header">
+            <div class="product-card-name">${esc(p.name)}</div>
+            <span class="badge badge-category">${esc(p.category)}</span>
+          </div>
+          <div class="product-card-row">
+            <span class="product-card-label">כמות</span>
+            <span>${p.qty}</span>
+          </div>
+          <div class="product-card-row">
+            <span class="product-card-label">סף נמוך / תקין</span>
+            <span>${p.low} / ${p.normal}</span>
+          </div>
+          <div class="product-card-row">
+            <span class="product-card-label">סטטוס</span>
+            <span>
+              <span class="badge badge-${st}">${st === 'low' ? 'נמוך' : 'תקין'}</span>
+              ${exp ? '<span class="badge badge-expiring" style="margin-right:4px">פג בקרוב</span>' : ''}
+            </span>
+          </div>
+          <div class="product-card-row">
+            <span class="product-card-label">תאריך תפוגה</span>
+            <input type="date" class="expiry-input" value="${p.expiry || ''}"
+              onchange="updateExpiry(${p.id}, this.value)" />
+          </div>
+          <div class="product-card-actions">
+            <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">מחק מוצר</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    updateStats();
+    updateCategoryFilter();
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function addProduct(e) {
+    e.preventDefault();
+    const name = document.getElementById('f-name').value.trim();
+    const category = document.getElementById('f-category').value;
+    const qty = parseInt(document.getElementById('f-qty').value);
+    const low = parseInt(document.getElementById('f-low').value);
+    const normal = parseInt(document.getElementById('f-normal').value);
+    const expiry = document.getElementById('f-expiry').value;
+
+    if (low >= normal) {
+      showToast('⚠️ סף מלאי נמוך חייב להיות קטן מסף מלאי תקין');
+      return;
+    }
+
+    products.push({ id: nextId++, name, category, qty, low, normal, expiry });
+    save();
+    clearForm();
+    renderTable();
+    showToast(`✅ "${name}" נוסף בהצלחה`);
+  }
+
+  function updateExpiry(id, value) {
+    const p = products.find(p => p.id === id);
+    if (p) {
+      p.expiry = value;
+      save();
+      renderTable();
+      showToast('✅ תאריך תפוגה עודכן');
+    }
+  }
+
+  function deleteProduct(id) {
+    const p = products.find(p => p.id === id);
+    if (!p) return;
+    if (!confirm(`למחוק את "${p.name}"?`)) return;
+    products = products.filter(p => p.id !== id);
+    save();
+    renderTable();
+    showToast('🗑️ המוצר נמחק');
+  }
+
+  function clearForm() {
+    ['f-name','f-qty','f-low','f-normal','f-expiry'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('f-category').value = '';
+  }
+
+  function togglePanel() {
+    const body = document.getElementById('add-panel');
+    const toggle = document.getElementById('panel-toggle');
+    body.classList.toggle('hidden');
+    toggle.classList.toggle('open');
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  renderTable();
+</script>
+</body>
+</html>
